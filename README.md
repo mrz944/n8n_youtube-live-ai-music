@@ -12,16 +12,16 @@ Continuous AI-generated music playing on a YouTube Live stream. Viewers influenc
 |  Bedrock Claude                      Suno API -> MP3          |
 |                                           |                   |
 |  Stream Controller                        v                   |
-|  (webhook)            /home/node/.n8n/music-stream/           |
+|  (webhook)            /home/node/.n8n-files/music-stream/     |
 |  YouTube Live API     queue/ <- MP3 files written here        |
 |  Saves state.json     state.json, mood.json                   |
 |                                                               |
 +---------------------------+-----------------------------------+
-                            | Volume: ~/.n8n:/home/node/.n8n
+                            | Volume: ~/.n8n-files:/home/node/.n8n-files
                             v
 +--- Host (Mikrus VPS) ----------------------------------------+
 |                                                               |
-|  ~/.n8n/music-stream/                                         |
+|  ~/.n8n-files/music-stream/                                   |
 |  +-- queue/        <- FFmpeg reads MP3s from here             |
 |  +-- playing/      <- Currently streaming                     |
 |  +-- played/       <- Already played                          |
@@ -37,20 +37,24 @@ Continuous AI-generated music playing on a YouTube Live stream. Viewers influenc
 
 ## Workflows
 
-### 1. Music Generator (`z5u89ssBnW6Bq74G`) - 14 nodes
+### 1. Music Generator (`z5u89ssBnW6Bq74G`) - 18 nodes
 
 **Trigger:** Schedule every 3 minutes
 
 **Flow:**
-1. Check queue size (count MP3 files in queue directory)
-2. If fewer than 2 songs queued, generate a new one:
-   - Read current mood from `mood.json`
-   - Build Suno V5 API request body from style description in `mood.json`
+1. Count queue files via `Read/Write Files from Disk` (glob: `queue/*.mp3`)
+2. Evaluate queue status in Code node (count items with binary data, set `needsGeneration`)
+3. If fewer than 2 songs queued, generate a new one:
+   - Read current mood via `Read/Write Files from Disk` (`mood.json`)
+   - Parse mood binary data in Code node with `Buffer.from(base64).toString()` and fallback defaults
+   - Build Suno V5 API request body from style description
    - POST to Suno API (`api.sunoapi.org`) to start generation (model V5, customMode, instrumental)
    - Poll task status for completion (90s wait + status check loop)
    - Download the generated MP3
    - Save to queue directory
-   - Update statistics in `state.json`
+   - Read state.json via `Read/Write Files from Disk`, update stats in Code node (outputs binary), write back via `Write Binary File`
+
+**Note:** File operations use `Read/Write Files from Disk` and `Write Binary File` nodes instead of `require('fs')` because the n8n task runner sandbox disallows the `fs` module. `Execute Command` is also disabled by default on Mikrus-hosted n8n.
 
 **Credentials:** Suno API (HTTP Header Auth)
 
@@ -117,28 +121,36 @@ The `style` field is passed directly to Suno V5 as the music generation prompt.
 ### 2. Host Setup (Mikrus VPS)
 
 ```bash
-# Create directories (uses existing n8n volume mount)
-mkdir -p ~/.n8n/music-stream/{queue,playing,played,scripts,logs}
+# Create directories (uses n8n-files volume mount)
+mkdir -p ~/.n8n-files/music-stream/{queue,playing,played,scripts,logs}
 
 # Install FFmpeg
 sudo apt-get install -y ffmpeg
 
 # Create background image for the video stream
 ffmpeg -f lavfi -i "color=c=0x1a1a2e:s=1280x720:d=1" \
-  -frames:v 1 ~/.n8n/music-stream/background.png
+  -frames:v 1 ~/.n8n-files/music-stream/background.png
 
 # Initialize state files
 echo '{"style":"A gentle lofi hip-hop beat with warm vinyl crackle, soft Rhodes piano chords, and a laid-back boom-bap drum pattern, Mellow bass hums underneath as ambient textures float in and out, 432Hz","title":"Late Night Drift","genre":"lofi","energy":"medium"}' \
-  > ~/.n8n/music-stream/mood.json
+  > ~/.n8n-files/music-stream/mood.json
 echo '{"broadcastId":null,"streamKey":null,"liveChatId":null,"isActive":false,"songsPlayed":0}' \
-  > ~/.n8n/music-stream/state.json
+  > ~/.n8n-files/music-stream/state.json
 
 # Copy the streaming script
-cp stream.sh ~/.n8n/music-stream/scripts/stream.sh
-chmod +x ~/.n8n/music-stream/scripts/stream.sh
+cp stream.sh ~/.n8n-files/music-stream/scripts/stream.sh
+chmod +x ~/.n8n-files/music-stream/scripts/stream.sh
+
+# Set ownership for n8n container user (UID 1000:1000)
+sudo chown -R 1000:1000 ~/.n8n-files
 ```
 
-No Docker container changes needed - uses the existing `~/.n8n` volume mount.
+**Docker Volume Requirement**: The n8n container must have this volume mount:
+```bash
+-v ~/.n8n-files:/home/node/.n8n-files
+```
+
+This maps the host's `~/.n8n-files/music-stream/` to the container's `/home/node/.n8n-files/music-stream/`, allowing file nodes to access the music stream directory.
 
 ## Usage
 
@@ -154,7 +166,7 @@ No Docker container changes needed - uses the existing `~/.n8n` volume mount.
    ```
 4. **Start FFmpeg on the host:**
    ```bash
-   nohup ~/.n8n/music-stream/scripts/stream.sh > /dev/null 2>&1 &
+   nohup ~/.n8n-files/music-stream/scripts/stream.sh > /dev/null 2>&1 &
    ```
 5. **Activate the Chat Monitor workflow** in n8n
 
@@ -170,7 +182,7 @@ curl -X POST https://your-n8n-domain/webhook/stream-control \
 
 1. **Stop FFmpeg on the host:**
    ```bash
-   kill $(cat ~/.n8n/music-stream/stream.pid)
+   kill $(cat ~/.n8n-files/music-stream/stream.pid)
    ```
 2. **End the broadcast:**
    ```bash
@@ -213,7 +225,7 @@ youtube-live-ai-music/
 **No songs being generated:**
 - Verify Suno API credentials are configured in n8n
 - Check the Music Generator workflow execution logs
-- Ensure /home/node/.n8n/music-stream/queue/ is writable inside the container
+- Ensure /home/node/.n8n-files/music-stream/queue/ is writable inside the container
 
 **Chat mood not changing:**
 - Verify AWS Bedrock credentials and Claude model access

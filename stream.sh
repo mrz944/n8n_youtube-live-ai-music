@@ -3,7 +3,7 @@
 # Runs on the HOST (not inside the n8n Docker container)
 # Reads MP3 files from the queue and streams them to YouTube via RTMP
 
-MUSIC_DIR="$HOME/.n8n/music-stream"
+MUSIC_DIR="$HOME/.n8n-files/music-stream"
 QUEUE_DIR="$MUSIC_DIR/queue"
 PLAYING_DIR="$MUSIC_DIR/playing"
 PLAYED_DIR="$MUSIC_DIR/played"
