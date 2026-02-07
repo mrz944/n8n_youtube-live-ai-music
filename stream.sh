@@ -22,8 +22,8 @@ get_rtmp_url() {
         return
     fi
     local rtmp_url stream_key
-    rtmp_url=$(python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('rtmpUrl',''))" < "$STATE_FILE" 2>/dev/null)
-    stream_key=$(python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('streamKey',''))" < "$STATE_FILE" 2>/dev/null)
+    rtmp_url=$(python3 -c "import sys,json; d=json.load(sys.stdin); d=d[0] if isinstance(d,list) else d; print(d.get('rtmpUrl',''))" < "$STATE_FILE" 2>/dev/null)
+    stream_key=$(python3 -c "import sys,json; d=json.load(sys.stdin); d=d[0] if isinstance(d,list) else d; print(d.get('streamKey',''))" < "$STATE_FILE" 2>/dev/null)
     if [ -n "$rtmp_url" ] && [ -n "$stream_key" ]; then
         echo "${rtmp_url}/${stream_key}"
     fi
@@ -35,7 +35,7 @@ is_active() {
         return 1
     fi
     local active
-    active=$(python3 -c "import sys,json; print(json.load(sys.stdin).get('isActive', False))" < "$STATE_FILE" 2>/dev/null)
+    active=$(python3 -c "import sys,json; d=json.load(sys.stdin); d=d[0] if isinstance(d,list) else d; print(d.get('isActive', False))" < "$STATE_FILE" 2>/dev/null)
     [ "$active" = "True" ]
 }
 
