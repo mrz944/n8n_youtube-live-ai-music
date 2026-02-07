@@ -109,7 +109,18 @@ while true; do
         # Move to played directory
         mv "$PLAYING_DIR/$FILENAME" "$PLAYED_DIR/$FILENAME"
     else
-        # Queue empty, wait and retry
-        sleep 5
+        # Queue empty - move one song from played directory for replay
+        REPLAY_FILE=$(ls -1 "$PLAYED_DIR"/*.mp3 2>/dev/null | sort | head -1)
+
+        if [ -n "$REPLAY_FILE" ]; then
+            FILENAME=$(basename "$REPLAY_FILE")
+            mv "$REPLAY_FILE" "$QUEUE_DIR/$FILENAME"
+            echo "[$(date)] REPLAY: Moved $FILENAME from played/ to queue/" >> "$LOG_FILE"
+            # Don't sleep - immediately try to play it in next iteration
+        else
+            # No songs available anywhere, wait
+            echo "[$(date)] No songs in queue or played directory, waiting..." >> "$LOG_FILE"
+            sleep 5
+        fi
     fi
 done
