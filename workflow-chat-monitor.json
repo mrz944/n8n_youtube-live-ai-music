@@ -1,5 +1,5 @@
 {
-    "updatedAt": "2026-02-07T01:36:14.217Z",
+    "updatedAt": "2026-02-07T16:01:33.104Z",
     "createdAt": "2026-02-07T00:28:37.677Z",
     "id": "9rAeeRlcMVWoryaE",
     "name": "Chat Monitor - AI Live Stream",
@@ -12,32 +12,61 @@
             "name": "Poll Every 45 Seconds",
             "type": "n8n-nodes-base.scheduleTrigger",
             "typeVersion": 1.2,
-            "position": [
-                -1400,
-                300
-            ],
+            "position": [-1400, 300],
             "parameters": {
-                "rule": {
-                    "interval": [
-                        {
-                            "field": "seconds",
-                            "secondsInterval": 45
-                        }
-                    ]
-                }
+                "rule": { "interval": [{ "field": "seconds", "secondsInterval": 45 }] }
             }
         },
         {
+            "id": "c0000001-0000-0000-0000-000000000020",
+            "name": "Read State File",
+            "type": "n8n-nodes-base.readWriteFile",
+            "typeVersion": 1.1,
+            "position": [-1160, 300],
+            "parameters": {
+                "fileSelector": "/home/node/.n8n-files/music-stream/state.json",
+                "options": {}
+            },
+            "onError": "continueRegularOutput"
+        },
+        {
+            "id": "c0000001-0000-0000-0000-000000000021",
+            "name": "Parse State",
+            "type": "n8n-nodes-base.extractFromFile",
+            "typeVersion": 1.1,
+            "position": [-920, 300],
+            "parameters": { "operation": "fromJson", "options": {} },
+            "onError": "continueRegularOutput"
+        },
+        {
+            "id": "c0000001-0000-0000-0000-000000000022",
+            "name": "Read Mood File",
+            "type": "n8n-nodes-base.readWriteFile",
+            "typeVersion": 1.1,
+            "position": [-680, 300],
+            "parameters": {
+                "fileSelector": "/home/node/.n8n-files/music-stream/mood.json",
+                "options": {}
+            },
+            "onError": "continueRegularOutput"
+        },
+        {
+            "id": "c0000001-0000-0000-0000-000000000023",
+            "name": "Parse Mood File",
+            "type": "n8n-nodes-base.extractFromFile",
+            "typeVersion": 1.1,
+            "position": [-440, 300],
+            "parameters": { "operation": "fromJson", "options": {} },
+            "onError": "continueRegularOutput"
+        },
+        {
             "id": "c0000001-0000-0000-0000-000000000002",
-            "name": "Read Stream State",
+            "name": "Combine State & Mood",
             "type": "n8n-nodes-base.code",
             "typeVersion": 2,
-            "position": [
-                -1160,
-                300
-            ],
+            "position": [-200, 300],
             "parameters": {
-                "jsCode": "const fs = require('fs');\n\nlet state = {};\ntry {\n  state = JSON.parse(fs.readFileSync('/home/node/.n8n/music-stream/state.json', 'utf8'));\n} catch(e) {\n  state = { isActive: false };\n}\n\nlet mood = {};\ntry {\n  mood = JSON.parse(fs.readFileSync('/home/node/.n8n/music-stream/mood.json', 'utf8'));\n} catch(e) {\n  mood = { style: 'A gentle lofi hip-hop beat with warm vinyl crackle, soft Rhodes piano chords, and a laid-back boom-bap drum pattern, Mellow bass hums underneath as ambient textures float in and out, 432Hz', title: 'Late Night Drift', genre: 'lofi', energy: 'medium' };\n}\n\nreturn [{\n  json: {\n    isActive: state.isActive || false,\n    liveChatId: state.liveChatId || null,\n    nextPageToken: state.nextPageToken || null,\n    currentMood: JSON.stringify(mood),\n    broadcastId: state.broadcastId || null\n  }\n}];"
+                "jsCode": "const stateInput = $node['Parse State'].json;\nconst state = stateInput.data || stateInput || {};\n\nlet mood = {};\ntry {\n  const moodInput = $node['Parse Mood File'].json;\n  mood = moodInput.data || moodInput || {};\n} catch(e) {\n  mood = { style: 'A gentle lofi hip-hop beat with warm vinyl crackle, soft Rhodes piano chords, and a laid-back boom-bap drum pattern, Mellow bass hums underneath as ambient textures float in and out, 432Hz', title: 'Late Night Drift', genre: 'lofi', energy: 'medium' };\n}\n\nreturn [{\n  json: {\n    isActive: state.isActive || false,\n    liveChatId: state.liveChatId || null,\n    nextPageToken: state.nextPageToken || null,\n    currentMood: JSON.stringify(mood),\n    broadcastId: state.broadcastId || null\n  }\n}];"
             }
         },
         {
@@ -45,34 +74,22 @@
             "name": "IF Stream Active",
             "type": "n8n-nodes-base.if",
             "typeVersion": 2,
-            "position": [
-                -920,
-                300
-            ],
+            "position": [40, 300],
             "parameters": {
                 "conditions": {
-                    "options": {
-                        "caseSensitive": true,
-                        "leftValue": ""
-                    },
+                    "options": { "caseSensitive": true, "leftValue": "" },
                     "conditions": [
                         {
                             "id": "cond-stream-active",
                             "leftValue": "={{ $json.isActive }}",
                             "rightValue": "",
-                            "operator": {
-                                "type": "boolean",
-                                "operation": "true"
-                            }
+                            "operator": { "type": "boolean", "operation": "true" }
                         },
                         {
                             "id": "cond-has-chat-id",
                             "leftValue": "={{ $json.liveChatId }}",
                             "rightValue": "",
-                            "operator": {
-                                "type": "string",
-                                "operation": "isNotEmpty"
-                            }
+                            "operator": { "type": "string", "operation": "isNotEmpty" }
                         }
                     ],
                     "combinator": "and"
@@ -85,32 +102,24 @@
             "name": "YouTube - Get Chat Messages",
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
-            "position": [
-                -680,
-                200
-            ],
+            "position": [280, 200],
             "continueOnFail": true,
             "parameters": {
                 "method": "GET",
                 "url": "=https://www.googleapis.com/youtube/v3/liveChat/messages?liveChatId={{ $json.liveChatId }}&part=snippet,authorDetails&maxResults=50{{ $json.nextPageToken ? '&pageToken=' + $json.nextPageToken : '' }}",
                 "authentication": "predefinedCredentialType",
                 "nodeCredentialType": "googleOAuth2Api",
-                "options": {
-                    "timeout": 15000
-                }
+                "options": { "timeout": 15000 }
             }
         },
         {
             "id": "c0000001-0000-0000-0000-000000000005",
-            "name": "Save Page Token & Filter",
+            "name": "Filter & Format Messages",
             "type": "n8n-nodes-base.code",
             "typeVersion": 2,
-            "position": [
-                -440,
-                200
-            ],
+            "position": [520, 200],
             "parameters": {
-                "jsCode": "const fs = require('fs');\nconst response = $input.first().json;\n\n// Save nextPageToken to state.json for next poll\ntry {\n  const statePath = '/home/node/.n8n/music-stream/state.json';\n  const tmpPath = statePath + '.tmp';\n  const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));\n  state.nextPageToken = response.nextPageToken || state.nextPageToken;\n  fs.writeFileSync(tmpPath, JSON.stringify(state, null, 2));\n  fs.renameSync(tmpPath, statePath);\n} catch(e) { /* ignore state write errors */ }\n\n// Extract and filter chat messages\nconst items = response.items || [];\nconst messages = items\n  .map(item => ({\n    author: item.authorDetails?.displayName || 'Unknown',\n    message: item.snippet?.displayMessage || '',\n    time: item.snippet?.publishedAt || ''\n  }))\n  .filter(m => m.message.trim().length > 1)\n  .slice(-20);\n\n// Format messages for LLM\nconst formattedMessages = messages\n  .map(m => `${m.author}: ${m.message}`)\n  .join('\\n');\n\n// Get current style for context\nconst currentMood = $node['Read Stream State'].json.currentMood;\n\nreturn [{\n  json: {\n    messageCount: messages.length,\n    hasMessages: messages.length > 0,\n    formattedMessages,\n    currentMood,\n    chatInput: `Current music style: ${currentMood}\\n\\nRecent YouTube live chat messages:\\n${formattedMessages}\\n\\nBased on these chat messages, decide the style for the next AI-generated instrumental track. Return ONLY valid JSON.`\n  }\n}];"
+                "jsCode": "const response = $input.first().json;\n\nconst items = response.items || [];\nconst messages = items\n  .map(item => ({\n    author: item.authorDetails?.displayName || 'Unknown',\n    message: item.snippet?.displayMessage || '',\n    time: item.snippet?.publishedAt || ''\n  }))\n  .filter(m => m.message.trim().length > 1)\n  .slice(-20);\n\nconst formattedMessages = messages\n  .map(m => `${m.author}: ${m.message}`)\n  .join('\\n');\n\nconst currentMood = $node['Combine State & Mood'].json.currentMood;\n\nreturn [{\n  json: {\n    messageCount: messages.length,\n    hasMessages: messages.length > 0,\n    formattedMessages,\n    currentMood,\n    chatInput: `Current music style: ${currentMood}\\n\\nRecent YouTube live chat messages:\\n${formattedMessages}\\n\\nBased on these chat messages, decide the style for the next AI-generated instrumental track. Return ONLY valid JSON.`\n  }\n}];"
             }
         },
         {
@@ -118,25 +127,16 @@
             "name": "IF Has Messages",
             "type": "n8n-nodes-base.if",
             "typeVersion": 2,
-            "position": [
-                -200,
-                200
-            ],
+            "position": [760, 200],
             "parameters": {
                 "conditions": {
-                    "options": {
-                        "caseSensitive": true,
-                        "leftValue": ""
-                    },
+                    "options": { "caseSensitive": true, "leftValue": "" },
                     "conditions": [
                         {
                             "id": "cond-has-messages",
                             "leftValue": "={{ $json.hasMessages }}",
                             "rightValue": "",
-                            "operator": {
-                                "type": "boolean",
-                                "operation": "true"
-                            }
+                            "operator": { "type": "boolean", "operation": "true" }
                         }
                     ],
                     "combinator": "and"
@@ -149,10 +149,7 @@
             "name": "Analyze Mood with Claude",
             "type": "@n8n/n8n-nodes-langchain.chainLlm",
             "typeVersion": 1.9,
-            "position": [
-                40,
-                100
-            ],
+            "position": [1000, 100],
             "parameters": {
                 "promptType": "define",
                 "text": "={{ $json.chatInput }}",
@@ -171,30 +168,44 @@
             "name": "AWS Bedrock Claude",
             "type": "@n8n/n8n-nodes-langchain.lmChatAwsBedrock",
             "typeVersion": 1.1,
-            "position": [
-                60,
-                320
-            ],
+            "position": [1020, 320],
             "parameters": {
                 "modelSource": "onDemand",
                 "model": "anthropic.claude-3-5-sonnet-20241022-v1:0",
-                "options": {
-                    "temperature": 0.7,
-                    "maxTokensToSample": 1024
-                }
+                "options": { "temperature": 0.7, "maxTokensToSample": 1024 }
             }
         },
         {
             "id": "c0000001-0000-0000-0000-000000000009",
-            "name": "Update Mood File",
+            "name": "Validate Mood Response",
             "type": "n8n-nodes-base.code",
             "typeVersion": 2,
-            "position": [
-                280,
-                100
-            ],
+            "position": [1240, 100],
             "parameters": {
-                "jsCode": "const fs = require('fs');\n\nconst llmResponse = $input.first().json;\n\n// The chain output is in the 'text' or 'output' field\nconst responseText = llmResponse.text || llmResponse.output || JSON.stringify(llmResponse);\n\n// Parse JSON from LLM response\nlet newMood;\ntry {\n  const jsonMatch = responseText.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    newMood = JSON.parse(jsonMatch[0]);\n  } else {\n    throw new Error('No JSON found in response');\n  }\n} catch(e) {\n  // If parsing fails, keep current mood\n  try {\n    newMood = JSON.parse(fs.readFileSync('/home/node/.n8n/music-stream/mood.json', 'utf8'));\n  } catch(e2) {\n    newMood = { style: 'A gentle lofi hip-hop beat with warm vinyl crackle, soft Rhodes piano chords, and a laid-back boom-bap drum pattern, Mellow bass hums underneath as ambient textures float in and out, 432Hz', title: 'Late Night Drift', genre: 'lofi', energy: 'medium' };\n  }\n}\n\n// Validate required fields\nconst validMood = {\n  style: (typeof newMood.style === 'string' && newMood.style.length > 10) ? newMood.style : 'A gentle lofi hip-hop beat with warm vinyl crackle, soft Rhodes piano chords, and a laid-back boom-bap drum pattern, 432Hz',\n  title: (typeof newMood.title === 'string' && newMood.title.length > 0) ? newMood.title.substring(0, 100) : 'Untitled Track',\n  genre: newMood.genre || 'lofi',\n  energy: ['low', 'medium', 'high'].includes(newMood.energy) ? newMood.energy : 'medium',\n  updatedAt: new Date().toISOString()\n};\n\n// Atomic write\nconst moodPath = '/home/node/.n8n/music-stream/mood.json';\nconst tmpPath = moodPath + '.tmp';\nfs.writeFileSync(tmpPath, JSON.stringify(validMood, null, 2));\nfs.renameSync(tmpPath, moodPath);\n\nreturn [{ json: { success: true, mood: validMood } }];"
+                "jsCode": "const llmResponse = $input.first().json;\nconst responseText = llmResponse.text || llmResponse.output || JSON.stringify(llmResponse);\n\nlet newMood;\ntry {\n  const jsonMatch = responseText.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    newMood = JSON.parse(jsonMatch[0]);\n  } else {\n    throw new Error('No JSON found in response');\n  }\n} catch(e) {\n  newMood = { style: 'A gentle lofi hip-hop beat with warm vinyl crackle, soft Rhodes piano chords, and a laid-back boom-bap drum pattern, Mellow bass hums underneath as ambient textures float in and out, 432Hz', title: 'Late Night Drift', genre: 'lofi', energy: 'medium' };\n}\n\nconst validMood = {\n  style: (typeof newMood.style === 'string' && newMood.style.length > 10) ? newMood.style : 'A gentle lofi hip-hop beat with warm vinyl crackle, soft Rhodes piano chords, and a laid-back boom-bap drum pattern, 432Hz',\n  title: (typeof newMood.title === 'string' && newMood.title.length > 0) ? newMood.title.substring(0, 100) : 'Untitled Track',\n  genre: newMood.genre || 'lofi',\n  energy: ['low', 'medium', 'high'].includes(newMood.energy) ? newMood.energy : 'medium',\n  updatedAt: new Date().toISOString()\n};\n\nreturn [{ json: validMood }];"
+            }
+        },
+        {
+            "id": "c0000001-0000-0000-0000-000000000030",
+            "name": "Mood to JSON File",
+            "type": "n8n-nodes-base.convertToFile",
+            "typeVersion": 1.1,
+            "position": [1480, 100],
+            "parameters": {
+                "operation": "toJson",
+                "options": { "format": true, "fileName": "mood.json" }
+            }
+        },
+        {
+            "id": "c0000001-0000-0000-0000-000000000031",
+            "name": "Write Mood File",
+            "type": "n8n-nodes-base.readWriteFile",
+            "typeVersion": 1.1,
+            "position": [1720, 100],
+            "parameters": {
+                "operation": "write",
+                "fileName": "/home/node/.n8n-files/music-stream/mood.json",
+                "options": {}
             }
         },
         {
@@ -202,10 +213,7 @@
             "name": "No Op - Stream Inactive",
             "type": "n8n-nodes-base.noOp",
             "typeVersion": 1,
-            "position": [
-                -680,
-                420
-            ],
+            "position": [280, 420],
             "parameters": {}
         },
         {
@@ -213,175 +221,64 @@
             "name": "No Op - No Messages",
             "type": "n8n-nodes-base.noOp",
             "typeVersion": 1,
-            "position": [
-                40,
-                320
-            ],
+            "position": [1000, 300],
             "parameters": {}
         }
     ],
     "connections": {
         "Poll Every 45 Seconds": {
-            "main": [
-                [
-                    {
-                        "node": "Read Stream State",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
+            "main": [[{ "node": "Read State File", "type": "main", "index": 0 }]]
         },
-        "Read Stream State": {
-            "main": [
-                [
-                    {
-                        "node": "IF Stream Active",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
+        "Read State File": {
+            "main": [[{ "node": "Parse State", "type": "main", "index": 0 }]]
+        },
+        "Parse State": {
+            "main": [[{ "node": "Read Mood File", "type": "main", "index": 0 }]]
+        },
+        "Read Mood File": {
+            "main": [[{ "node": "Parse Mood File", "type": "main", "index": 0 }]]
+        },
+        "Parse Mood File": {
+            "main": [[{ "node": "Combine State & Mood", "type": "main", "index": 0 }]]
+        },
+        "Combine State & Mood": {
+            "main": [[{ "node": "IF Stream Active", "type": "main", "index": 0 }]]
         },
         "IF Stream Active": {
             "main": [
-                [
-                    {
-                        "node": "YouTube - Get Chat Messages",
-                        "type": "main",
-                        "index": 0
-                    }
-                ],
-                [
-                    {
-                        "node": "No Op - Stream Inactive",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
+                [{ "node": "YouTube - Get Chat Messages", "type": "main", "index": 0 }],
+                [{ "node": "No Op - Stream Inactive", "type": "main", "index": 0 }]
             ]
         },
         "YouTube - Get Chat Messages": {
-            "main": [
-                [
-                    {
-                        "node": "Save Page Token & Filter",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
+            "main": [[{ "node": "Filter & Format Messages", "type": "main", "index": 0 }]]
         },
-        "Save Page Token & Filter": {
-            "main": [
-                [
-                    {
-                        "node": "IF Has Messages",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
+        "Filter & Format Messages": {
+            "main": [[{ "node": "IF Has Messages", "type": "main", "index": 0 }]]
         },
         "IF Has Messages": {
             "main": [
-                [
-                    {
-                        "node": "Analyze Mood with Claude",
-                        "type": "main",
-                        "index": 0
-                    }
-                ],
-                [
-                    {
-                        "node": "No Op - No Messages",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
+                [{ "node": "Analyze Mood with Claude", "type": "main", "index": 0 }],
+                [{ "node": "No Op - No Messages", "type": "main", "index": 0 }]
             ]
         },
         "Analyze Mood with Claude": {
-            "main": [
-                [
-                    {
-                        "node": "Update Mood File",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
+            "main": [[{ "node": "Validate Mood Response", "type": "main", "index": 0 }]]
+        },
+        "Validate Mood Response": {
+            "main": [[{ "node": "Mood to JSON File", "type": "main", "index": 0 }]]
+        },
+        "Mood to JSON File": {
+            "main": [[{ "node": "Write Mood File", "type": "main", "index": 0 }]]
         },
         "AWS Bedrock Claude": {
-            "ai_languageModel": [
-                [
-                    {
-                        "node": "Analyze Mood with Claude",
-                        "type": "ai_languageModel",
-                        "index": 0
-                    }
-                ]
-            ]
+            "ai_languageModel": [[{ "node": "Analyze Mood with Claude", "type": "ai_languageModel", "index": 0 }]]
         }
     },
     "settings": {
         "executionOrder": "v1",
-        "callerPolicy": "workflowsFromSameOwner",
-        "availableInMCP": false
+        "callerPolicy": "workflowsFromSameOwner"
     },
-    "staticData": null,
-    "meta": null,
-    "pinData": null,
-    "versionId": "62bbce46-f1f0-46da-8a94-fb04ba696f18",
-    "activeVersionId": null,
-    "versionCounter": 2,
-    "triggerCount": 0,
-    "shared": [
-        {
-            "updatedAt": "2026-02-07T00:28:37.682Z",
-            "createdAt": "2026-02-07T00:28:37.682Z",
-            "role": "workflow:owner",
-            "workflowId": "9rAeeRlcMVWoryaE",
-            "projectId": "6RAJcBVHKTCwT4Nk",
-            "project": {
-                "updatedAt": "2026-01-31T20:05:52.751Z",
-                "createdAt": "2026-01-31T20:04:16.860Z",
-                "id": "6RAJcBVHKTCwT4Nk",
-                "name": "Marcin Zadka <gamboox@gmail.com>",
-                "type": "personal",
-                "icon": null,
-                "description": null,
-                "creatorId": "e59d292a-3ff3-4536-9954-55f7b84be35c",
-                "projectRelations": [
-                    {
-                        "updatedAt": "2026-01-31T20:04:16.861Z",
-                        "createdAt": "2026-01-31T20:04:16.861Z",
-                        "userId": "e59d292a-3ff3-4536-9954-55f7b84be35c",
-                        "projectId": "6RAJcBVHKTCwT4Nk",
-                        "user": {
-                            "updatedAt": "2026-02-06T23:26:28.000Z",
-                            "createdAt": "2026-01-31T20:04:15.351Z",
-                            "id": "e59d292a-3ff3-4536-9954-55f7b84be35c",
-                            "email": "gamboox@gmail.com",
-                            "firstName": "Marcin",
-                            "lastName": "Zadka",
-                            "personalizationAnswers": null,
-                            "settings": {
-                                "userActivated": true,
-                                "easyAIWorkflowOnboarded": true,
-                                "firstSuccessfulWorkflowId": "Bz5z78wyJwX7QtpaGItlN",
-                                "userActivatedAt": 1769976033082
-                            },
-                            "disabled": false,
-                            "mfaEnabled": false,
-                            "lastActiveAt": "2026-02-06",
-                            "isPending": false
-                        }
-                    }
-                ]
-            }
-        }
-    ],
-    "tags": [],
-    "activeVersion": null
+    "pinData": {},
+    "tags": [{ "name": "YouTube-ai-live-stream" }]
 }

@@ -1,5 +1,4 @@
 {
-  "name": "Music Generator - AI Live Stream",
   "nodes": [
     {
       "parameters": {
@@ -18,21 +17,21 @@
       "typeVersion": 1.2,
       "position": [
         -1408,
-        304
+        288
       ]
     },
     {
       "parameters": {
-        "operation": "read",
-        "fileSelector": "/home/node/.n8n-files/music-stream/queue/*.mp3"
+        "fileSelector": "/home/node/.n8n-files/music-stream/queue/*.mp3",
+        "options": {}
       },
       "id": "a0000001-0000-0000-0000-000000000015",
       "name": "Count Queue Files",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1.1,
       "position": [
-        -1168,
-        304
+        -1184,
+        288
       ],
       "alwaysOutputData": true,
       "onError": "continueRegularOutput"
@@ -46,8 +45,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -928,
-        304
+        -960,
+        288
       ]
     },
     {
@@ -80,30 +79,28 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        -688,
-        304
+        -736,
+        288
       ]
     },
     {
       "parameters": {
-        "operation": "read",
-        "fileSelector": "/home/node/.n8n-files/music-stream/mood.json"
+        "fileSelector": "/home/node/.n8n-files/music-stream/mood.json",
+        "options": {}
       },
       "id": "a0000001-0000-0000-0000-000000000017",
       "name": "Read Mood File",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1.1,
       "position": [
-        -448,
-        208
+        -512,
+        192
       ],
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
         "operation": "fromJson",
-        "binaryPropertyName": "data",
-        "destinationKey": "data",
         "options": {}
       },
       "id": "a0000001-0000-0000-0000-000000000030",
@@ -111,8 +108,8 @@
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1.1,
       "position": [
-        -328,
-        208
+        -288,
+        192
       ],
       "onError": "continueRegularOutput"
     },
@@ -125,8 +122,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -208,
-        208
+        -64,
+        192
       ]
     },
     {
@@ -138,8 +135,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        32,
-        208
+        160,
+        192
       ],
       "alwaysOutputData": false
     },
@@ -161,8 +158,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        272,
-        208
+        384,
+        192
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -185,8 +182,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        480,
-        208
+        608,
+        192
       ]
     },
     {
@@ -198,11 +195,10 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        688,
-        208
+        832,
+        192
       ],
-      "webhookId": "73563fef-f90d-4398-b659-fc1da7449984",
-      "disabled": true
+      "webhookId": "73563fef-f90d-4398-b659-fc1da7449984"
     },
     {
       "parameters": {
@@ -218,8 +214,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        880,
-        208
+        1056,
+        112
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -262,8 +258,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        1088,
-        208
+        1280,
+        192
       ]
     },
     {
@@ -283,8 +279,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1280,
-        112
+        1504,
+        192
       ],
       "onError": "continueRegularOutput"
     },
@@ -292,7 +288,6 @@
       "parameters": {
         "operation": "write",
         "fileName": "=/home/node/.n8n-files/music-stream/queue/{{ $node[\"Craft Suno Prompt\"].json.songId }}.mp3",
-        "dataPropertyName": "data",
         "options": {}
       },
       "id": "a0000001-0000-0000-0000-000000000012",
@@ -300,30 +295,28 @@
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1.1,
       "position": [
-        1488,
-        112
+        1728,
+        192
       ]
     },
     {
       "parameters": {
-        "operation": "read",
-        "fileSelector": "/home/node/.n8n-files/music-stream/state.json"
+        "fileSelector": "/home/node/.n8n-files/music-stream/state.json",
+        "options": {}
       },
       "id": "a0000001-0000-0000-0000-000000000019",
       "name": "Read State File",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1.1,
       "position": [
-        1648,
-        112
+        1952,
+        192
       ],
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
         "operation": "fromJson",
-        "binaryPropertyName": "data",
-        "destinationKey": "data",
         "options": {}
       },
       "id": "a0000001-0000-0000-0000-000000000031",
@@ -331,8 +324,8 @@
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1.1,
       "position": [
-        1808,
-        112
+        2176,
+        192
       ],
       "onError": "continueRegularOutput"
     },
@@ -345,15 +338,13 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1968,
-        112
+        2400,
+        192
       ]
     },
     {
       "parameters": {
         "operation": "toJson",
-        "mode": "once",
-        "binaryPropertyName": "data",
         "options": {
           "format": true,
           "fileName": "state.json"
@@ -364,15 +355,14 @@
       "type": "n8n-nodes-base.convertToFile",
       "typeVersion": 1.1,
       "position": [
-        2128,
-        112
+        2624,
+        192
       ]
     },
     {
       "parameters": {
         "operation": "write",
         "fileName": "/home/node/.n8n-files/music-stream/state.json",
-        "dataPropertyName": "data",
         "options": {}
       },
       "id": "a0000001-0000-0000-0000-000000000021",
@@ -380,8 +370,8 @@
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1.1,
       "position": [
-        2288,
-        112
+        2848,
+        192
       ]
     },
     {
@@ -391,8 +381,8 @@
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        -448,
-        432
+        -512,
+        384
       ]
     }
   ],
@@ -510,11 +500,6 @@
             "node": "Wait for Generation",
             "type": "main",
             "index": 0
-          },
-          {
-            "node": "Suno API - Check Status",
-            "type": "main",
-            "index": 0
           }
         ]
       ]
@@ -626,7 +611,8 @@
       ]
     }
   },
-  "settings": {
-    "executionOrder": "v1"
+  "pinData": {},
+  "meta": {
+    "instanceId": "dff996d026d44117a8af89e16a2e0d723d499d554b6aeb48b92a27c916d45084"
   }
 }

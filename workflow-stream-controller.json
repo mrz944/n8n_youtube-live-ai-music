@@ -1,5 +1,5 @@
 {
-    "updatedAt": "2026-02-07T00:39:35.072Z",
+    "updatedAt": "2026-02-07T15:59:11.816Z",
     "createdAt": "2026-02-06T22:33:18.592Z",
     "id": "vO3TJ3FajfSHXICz",
     "name": "Stream Controller - AI Live Stream",
@@ -12,10 +12,7 @@
             "name": "Webhook - Stream Control",
             "type": "n8n-nodes-base.webhook",
             "typeVersion": 2,
-            "position": [
-                -1600,
-                300
-            ],
+            "position": [-1600, 300],
             "parameters": {
                 "httpMethod": "POST",
                 "path": "stream-control",
@@ -30,10 +27,7 @@
             "name": "Route Action",
             "type": "n8n-nodes-base.switch",
             "typeVersion": 3.2,
-            "position": [
-                -1360,
-                300
-            ],
+            "position": [-1360, 300],
             "parameters": {
                 "mode": "expression",
                 "output": "={{ $json.body.action === 'start' ? 0 : $json.body.action === 'stop' ? 1 : 2 }}"
@@ -44,10 +38,7 @@
             "name": "YouTube - Create Broadcast",
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
-            "position": [
-                -1100,
-                100
-            ],
+            "position": [-1100, 100],
             "parameters": {
                 "method": "POST",
                 "url": "https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status,contentDetails",
@@ -57,9 +48,7 @@
                 "contentType": "json",
                 "specifyBody": "json",
                 "jsonBody": "={{ JSON.stringify({ snippet: { title: 'AI Generated Music - Live Stream', description: 'Continuous AI-generated music. Chat to change the mood! Commands: suggest genres, moods, or vibes in chat.', scheduledStartTime: new Date().toISOString() }, status: { privacyStatus: 'unlisted', selfDeclaredMadeForKids: false }, contentDetails: { enableAutoStart: true, enableAutoStop: false, enableDvr: true, latencyPreference: 'normal' } }) }}",
-                "options": {
-                    "timeout": 30000
-                }
+                "options": { "timeout": 30000 }
             }
         },
         {
@@ -67,10 +56,7 @@
             "name": "YouTube - Create Stream",
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
-            "position": [
-                -860,
-                100
-            ],
+            "position": [-860, 100],
             "parameters": {
                 "method": "POST",
                 "url": "https://www.googleapis.com/youtube/v3/liveStreams?part=snippet,cdn",
@@ -80,9 +66,7 @@
                 "contentType": "json",
                 "specifyBody": "json",
                 "jsonBody": "={{ JSON.stringify({ snippet: { title: 'AI Music Stream Feed' }, cdn: { frameRate: '30fps', ingestionType: 'rtmp', resolution: '720p' } }) }}",
-                "options": {
-                    "timeout": 30000
-                }
+                "options": { "timeout": 30000 }
             }
         },
         {
@@ -90,31 +74,46 @@
             "name": "YouTube - Bind Broadcast",
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
-            "position": [
-                -620,
-                100
-            ],
+            "position": [-620, 100],
             "parameters": {
                 "method": "POST",
                 "url": "=https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?id={{ $node[\"YouTube - Create Broadcast\"].json.id }}&streamId={{ $json.id }}&part=id,contentDetails",
                 "authentication": "predefinedCredentialType",
                 "nodeCredentialType": "googleOAuth2Api",
-                "options": {
-                    "timeout": 30000
-                }
+                "options": { "timeout": 30000 }
             }
         },
         {
             "id": "b0000001-0000-0000-0000-000000000006",
-            "name": "Save Stream State",
+            "name": "Build Stream State",
             "type": "n8n-nodes-base.code",
             "typeVersion": 2,
-            "position": [
-                -380,
-                100
-            ],
+            "position": [-380, 100],
             "parameters": {
-                "jsCode": "const fs = require('fs');\n\nconst broadcastData = $node['YouTube - Create Broadcast'].json;\nconst streamData = $node['YouTube - Create Stream'].json;\n\nconst state = {\n  isActive: true,\n  broadcastId: broadcastData.id,\n  liveChatId: broadcastData.snippet.liveChatId,\n  streamId: streamData.id,\n  rtmpUrl: streamData.cdn.ingestionInfo.ingestionAddress,\n  streamKey: streamData.cdn.ingestionInfo.streamName,\n  title: broadcastData.snippet.title,\n  startedAt: new Date().toISOString(),\n  songsPlayed: 0,\n  songsGenerated: 0,\n  nextPageToken: null\n};\n\nconst tmpPath = '/home/node/.n8n/music-stream/state.json.tmp';\nconst finalPath = '/home/node/.n8n/music-stream/state.json';\nfs.writeFileSync(tmpPath, JSON.stringify(state, null, 2));\nfs.renameSync(tmpPath, finalPath);\n\nreturn [{ json: state }];"
+                "jsCode": "const broadcastData = $node['YouTube - Create Broadcast'].json;\nconst streamData = $node['YouTube - Create Stream'].json;\n\nconst state = {\n  isActive: true,\n  broadcastId: broadcastData.id,\n  liveChatId: broadcastData.snippet.liveChatId,\n  streamId: streamData.id,\n  rtmpUrl: streamData.cdn.ingestionInfo.ingestionAddress,\n  streamKey: streamData.cdn.ingestionInfo.streamName,\n  title: broadcastData.snippet.title,\n  startedAt: new Date().toISOString(),\n  songsPlayed: 0,\n  songsGenerated: 0,\n  nextPageToken: null\n};\n\nreturn [{ json: state }];"
+            }
+        },
+        {
+            "id": "b0000001-0000-0000-0000-000000000025",
+            "name": "State to JSON File",
+            "type": "n8n-nodes-base.convertToFile",
+            "typeVersion": 1.1,
+            "position": [-140, 100],
+            "parameters": {
+                "operation": "toJson",
+                "options": { "format": true, "fileName": "state.json" }
+            }
+        },
+        {
+            "id": "b0000001-0000-0000-0000-000000000026",
+            "name": "Write State File",
+            "type": "n8n-nodes-base.readWriteFile",
+            "typeVersion": 1.1,
+            "position": [100, 100],
+            "parameters": {
+                "operation": "write",
+                "fileName": "/home/node/.n8n-files/music-stream/state.json",
+                "options": {}
             }
         },
         {
@@ -122,34 +121,22 @@
             "name": "Wait for Stream Connect",
             "type": "n8n-nodes-base.wait",
             "typeVersion": 1.1,
-            "position": [
-                340,
-                100
-            ],
-            "parameters": {
-                "resume": "timeInterval",
-                "amount": 15,
-                "unit": "seconds"
-            }
+            "position": [340, 100],
+            "parameters": { "resume": "timeInterval", "amount": 15, "unit": "seconds" }
         },
         {
             "id": "b0000001-0000-0000-0000-000000000010",
             "name": "YouTube - Transition to Testing",
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
-            "position": [
-                580,
-                100
-            ],
+            "position": [580, 100],
             "continueOnFail": true,
             "parameters": {
                 "method": "POST",
-                "url": "=https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?broadcastStatus=testing&id={{ $node[\"Save Stream State\"].json.broadcastId }}&part=status",
+                "url": "=https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?broadcastStatus=testing&id={{ $node[\"Build Stream State\"].json.broadcastId }}&part=status",
                 "authentication": "predefinedCredentialType",
                 "nodeCredentialType": "googleOAuth2Api",
-                "options": {
-                    "timeout": 30000
-                }
+                "options": { "timeout": 30000 }
             }
         },
         {
@@ -157,34 +144,22 @@
             "name": "Wait for Testing",
             "type": "n8n-nodes-base.wait",
             "typeVersion": 1.1,
-            "position": [
-                820,
-                100
-            ],
-            "parameters": {
-                "resume": "timeInterval",
-                "amount": 10,
-                "unit": "seconds"
-            }
+            "position": [820, 100],
+            "parameters": { "resume": "timeInterval", "amount": 10, "unit": "seconds" }
         },
         {
             "id": "b0000001-0000-0000-0000-000000000012",
             "name": "YouTube - Transition to Live",
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
-            "position": [
-                1060,
-                100
-            ],
+            "position": [1060, 100],
             "continueOnFail": true,
             "parameters": {
                 "method": "POST",
-                "url": "=https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?broadcastStatus=live&id={{ $node[\"Save Stream State\"].json.broadcastId }}&part=status",
+                "url": "=https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?broadcastStatus=live&id={{ $node[\"Build Stream State\"].json.broadcastId }}&part=status",
                 "authentication": "predefinedCredentialType",
                 "nodeCredentialType": "googleOAuth2Api",
-                "options": {
-                    "timeout": 30000
-                }
+                "options": { "timeout": 30000 }
             }
         },
         {
@@ -192,47 +167,80 @@
             "name": "Respond - Start Success",
             "type": "n8n-nodes-base.respondToWebhook",
             "typeVersion": 1.1,
-            "position": [
-                1300,
-                100
-            ],
+            "position": [1300, 100],
             "parameters": {
                 "respondWith": "json",
-                "responseBody": "={{ JSON.stringify({ status: 'success', message: 'YouTube broadcast created. Start FFmpeg on the host: ~/.n8n/music-stream/scripts/stream.sh', broadcastId: $node['Save Stream State'].json.broadcastId, liveChatId: $node['Save Stream State'].json.liveChatId, streamUrl: 'https://www.youtube.com/watch?v=' + $node['Save Stream State'].json.broadcastId, rtmpUrl: $node['Save Stream State'].json.rtmpUrl, streamKey: $node['Save Stream State'].json.streamKey }) }}",
+                "responseBody": "={{ JSON.stringify({ status: 'success', message: 'YouTube broadcast created. Start FFmpeg on the host.', broadcastId: $node['Build Stream State'].json.broadcastId, liveChatId: $node['Build Stream State'].json.liveChatId, streamUrl: 'https://www.youtube.com/watch?v=' + $node['Build Stream State'].json.broadcastId, rtmpUrl: $node['Build Stream State'].json.rtmpUrl, streamKey: $node['Build Stream State'].json.streamKey }) }}",
                 "options": {}
             }
+        },
+        {
+            "id": "b0000001-0000-0000-0000-000000000020",
+            "name": "Read State for Stop",
+            "type": "n8n-nodes-base.readWriteFile",
+            "typeVersion": 1.1,
+            "position": [-1100, 300],
+            "parameters": {
+                "fileSelector": "/home/node/.n8n-files/music-stream/state.json",
+                "options": {}
+            },
+            "onError": "continueRegularOutput"
+        },
+        {
+            "id": "b0000001-0000-0000-0000-000000000027",
+            "name": "Extract State for Stop",
+            "type": "n8n-nodes-base.extractFromFile",
+            "typeVersion": 1.1,
+            "position": [-860, 300],
+            "parameters": { "operation": "fromJson", "options": {} },
+            "onError": "continueRegularOutput"
         },
         {
             "id": "b0000001-0000-0000-0000-000000000015",
             "name": "YouTube - End Broadcast",
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
-            "position": [
-                -860,
-                300
-            ],
+            "position": [-620, 300],
             "continueOnFail": true,
             "parameters": {
                 "method": "POST",
-                "url": "=https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?broadcastStatus=complete&id={{ $node[\"Read State for Stop\"].json.broadcastId }}&part=status",
+                "url": "=https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?broadcastStatus=complete&id={{ $node[\"Extract State for Stop\"].json.data.broadcastId }}&part=status",
                 "authentication": "predefinedCredentialType",
                 "nodeCredentialType": "googleOAuth2Api",
-                "options": {
-                    "timeout": 30000
-                }
+                "options": { "timeout": 30000 }
             }
         },
         {
             "id": "b0000001-0000-0000-0000-000000000016",
-            "name": "Update State Stopped",
+            "name": "Mark State Stopped",
             "type": "n8n-nodes-base.code",
             "typeVersion": 2,
-            "position": [
-                -620,
-                300
-            ],
+            "position": [-380, 300],
             "parameters": {
-                "jsCode": "const fs = require('fs');\n\nconst statePath = '/home/node/.n8n/music-stream/state.json';\nconst tmpPath = statePath + '.tmp';\n\nlet state = {};\ntry {\n  state = JSON.parse(fs.readFileSync(statePath, 'utf8'));\n} catch(e) {\n  state = {};\n}\n\nstate.isActive = false;\nstate.stoppedAt = new Date().toISOString();\n\nfs.writeFileSync(tmpPath, JSON.stringify(state, null, 2));\nfs.renameSync(tmpPath, statePath);\n\nreturn [{ json: { status: 'stopped', broadcastId: state.broadcastId } }];"
+                "jsCode": "const parsed = $node['Extract State for Stop'].json;\nconst state = { ...(parsed.data || parsed) };\n\nstate.isActive = false;\nstate.stoppedAt = new Date().toISOString();\n\nreturn [{ json: state }];"
+            }
+        },
+        {
+            "id": "b0000001-0000-0000-0000-000000000028",
+            "name": "Stopped State to File",
+            "type": "n8n-nodes-base.convertToFile",
+            "typeVersion": 1.1,
+            "position": [-140, 300],
+            "parameters": {
+                "operation": "toJson",
+                "options": { "format": true, "fileName": "state.json" }
+            }
+        },
+        {
+            "id": "b0000001-0000-0000-0000-000000000029",
+            "name": "Write Stopped State",
+            "type": "n8n-nodes-base.readWriteFile",
+            "typeVersion": 1.1,
+            "position": [100, 300],
+            "parameters": {
+                "operation": "write",
+                "fileName": "/home/node/.n8n-files/music-stream/state.json",
+                "options": {}
             }
         },
         {
@@ -240,27 +248,42 @@
             "name": "Respond - Stop Success",
             "type": "n8n-nodes-base.respondToWebhook",
             "typeVersion": 1.1,
-            "position": [
-                -380,
-                300
-            ],
+            "position": [340, 300],
             "parameters": {
                 "respondWith": "json",
-                "responseBody": "={{ JSON.stringify({ status: 'success', message: 'Stream stopped', broadcastId: $json.broadcastId }) }}",
+                "responseBody": "={{ JSON.stringify({ status: 'success', message: 'Stream stopped', broadcastId: $node['Mark State Stopped'].json.broadcastId }) }}",
                 "options": {}
             }
         },
         {
             "id": "b0000001-0000-0000-0000-000000000018",
             "name": "Read State for Status",
+            "type": "n8n-nodes-base.readWriteFile",
+            "typeVersion": 1.1,
+            "position": [-1100, 500],
+            "parameters": {
+                "fileSelector": "/home/node/.n8n-files/music-stream/state.json",
+                "options": {}
+            },
+            "onError": "continueRegularOutput"
+        },
+        {
+            "id": "b0000001-0000-0000-0000-000000000030",
+            "name": "Parse State for Status",
+            "type": "n8n-nodes-base.extractFromFile",
+            "typeVersion": 1.1,
+            "position": [-860, 500],
+            "parameters": { "operation": "fromJson", "options": {} },
+            "onError": "continueRegularOutput"
+        },
+        {
+            "id": "b0000001-0000-0000-0000-000000000031",
+            "name": "Build Status Response",
             "type": "n8n-nodes-base.code",
             "typeVersion": 2,
-            "position": [
-                -1100,
-                500
-            ],
+            "position": [-620, 500],
             "parameters": {
-                "jsCode": "const fs = require('fs');\n\nlet state = {};\ntry {\n  state = JSON.parse(fs.readFileSync('/home/node/.n8n/music-stream/state.json', 'utf8'));\n} catch(e) {\n  state = { isActive: false, error: 'State file not found' };\n}\n\nlet queueSize = 0;\ntry {\n  queueSize = fs.readdirSync('/home/node/.n8n/music-stream/queue/').filter(f => f.endsWith('.mp3')).length;\n} catch(e) {}\n\nlet playingFiles = [];\ntry {\n  playingFiles = fs.readdirSync('/home/node/.n8n/music-stream/playing/').filter(f => f.endsWith('.mp3'));\n} catch(e) {}\n\nlet mood = {};\ntry {\n  mood = JSON.parse(fs.readFileSync('/home/node/.n8n/music-stream/mood.json', 'utf8'));\n} catch(e) {}\n\nreturn [{ json: {\n  ...state,\n  queueSize,\n  currentlyPlaying: playingFiles[0] || null,\n  currentMood: mood,\n  checkedAt: new Date().toISOString()\n} }];"
+                "jsCode": "const parsed = $input.first().json;\nconst state = parsed.data || parsed || {};\n\nreturn [{ json: {\n  ...state,\n  checkedAt: new Date().toISOString()\n} }];"
             }
         },
         {
@@ -268,258 +291,87 @@
             "name": "Respond - Status",
             "type": "n8n-nodes-base.respondToWebhook",
             "typeVersion": 1.1,
-            "position": [
-                -860,
-                500
-            ],
+            "position": [-380, 500],
             "parameters": {
                 "respondWith": "json",
                 "responseBody": "={{ JSON.stringify($json) }}",
                 "options": {}
             }
-        },
-        {
-            "id": "b0000001-0000-0000-0000-000000000020",
-            "name": "Read State for Stop",
-            "type": "n8n-nodes-base.code",
-            "typeVersion": 2,
-            "position": [
-                -1100,
-                200
-            ],
-            "parameters": {
-                "jsCode": "const fs = require('fs');\n\nlet state = {};\ntry {\n  state = JSON.parse(fs.readFileSync('/home/node/.n8n/music-stream/state.json', 'utf8'));\n} catch(e) {\n  state = { broadcastId: null };\n}\n\nreturn [{ json: state }];"
-            }
         }
     ],
     "connections": {
         "Webhook - Stream Control": {
-            "main": [
-                [
-                    {
-                        "node": "Route Action",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
+            "main": [[{ "node": "Route Action", "type": "main", "index": 0 }]]
         },
         "Route Action": {
             "main": [
-                [
-                    {
-                        "node": "YouTube - Create Broadcast",
-                        "type": "main",
-                        "index": 0
-                    }
-                ],
-                [
-                    {
-                        "node": "Read State for Stop",
-                        "type": "main",
-                        "index": 0
-                    }
-                ],
-                [
-                    {
-                        "node": "Read State for Status",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
+                [{ "node": "YouTube - Create Broadcast", "type": "main", "index": 0 }],
+                [{ "node": "Read State for Stop", "type": "main", "index": 0 }],
+                [{ "node": "Read State for Status", "type": "main", "index": 0 }]
             ]
         },
         "YouTube - Create Broadcast": {
-            "main": [
-                [
-                    {
-                        "node": "YouTube - Create Stream",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
+            "main": [[{ "node": "YouTube - Create Stream", "type": "main", "index": 0 }]]
         },
         "YouTube - Create Stream": {
-            "main": [
-                [
-                    {
-                        "node": "YouTube - Bind Broadcast",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
+            "main": [[{ "node": "YouTube - Bind Broadcast", "type": "main", "index": 0 }]]
         },
         "YouTube - Bind Broadcast": {
-            "main": [
-                [
-                    {
-                        "node": "Save Stream State",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
+            "main": [[{ "node": "Build Stream State", "type": "main", "index": 0 }]]
+        },
+        "Build Stream State": {
+            "main": [[{ "node": "State to JSON File", "type": "main", "index": 0 }]]
+        },
+        "State to JSON File": {
+            "main": [[{ "node": "Write State File", "type": "main", "index": 0 }]]
+        },
+        "Write State File": {
+            "main": [[{ "node": "Wait for Stream Connect", "type": "main", "index": 0 }]]
         },
         "Wait for Stream Connect": {
-            "main": [
-                [
-                    {
-                        "node": "YouTube - Transition to Testing",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
+            "main": [[{ "node": "YouTube - Transition to Testing", "type": "main", "index": 0 }]]
         },
         "YouTube - Transition to Testing": {
-            "main": [
-                [
-                    {
-                        "node": "Wait for Testing",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
+            "main": [[{ "node": "Wait for Testing", "type": "main", "index": 0 }]]
         },
         "Wait for Testing": {
-            "main": [
-                [
-                    {
-                        "node": "YouTube - Transition to Live",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
+            "main": [[{ "node": "YouTube - Transition to Live", "type": "main", "index": 0 }]]
         },
         "YouTube - Transition to Live": {
-            "main": [
-                [
-                    {
-                        "node": "Respond - Start Success",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "YouTube - End Broadcast": {
-            "main": [
-                [
-                    {
-                        "node": "Update State Stopped",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "Update State Stopped": {
-            "main": [
-                [
-                    {
-                        "node": "Respond - Stop Success",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "Read State for Status": {
-            "main": [
-                [
-                    {
-                        "node": "Respond - Status",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "Save Stream State": {
-            "main": [
-                [
-                    {
-                        "node": "Wait for Stream Connect",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
+            "main": [[{ "node": "Respond - Start Success", "type": "main", "index": 0 }]]
         },
         "Read State for Stop": {
-            "main": [
-                [
-                    {
-                        "node": "YouTube - End Broadcast",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
+            "main": [[{ "node": "Extract State for Stop", "type": "main", "index": 0 }]]
+        },
+        "Extract State for Stop": {
+            "main": [[{ "node": "YouTube - End Broadcast", "type": "main", "index": 0 }]]
+        },
+        "YouTube - End Broadcast": {
+            "main": [[{ "node": "Mark State Stopped", "type": "main", "index": 0 }]]
+        },
+        "Mark State Stopped": {
+            "main": [[{ "node": "Stopped State to File", "type": "main", "index": 0 }]]
+        },
+        "Stopped State to File": {
+            "main": [[{ "node": "Write Stopped State", "type": "main", "index": 0 }]]
+        },
+        "Write Stopped State": {
+            "main": [[{ "node": "Respond - Stop Success", "type": "main", "index": 0 }]]
+        },
+        "Read State for Status": {
+            "main": [[{ "node": "Parse State for Status", "type": "main", "index": 0 }]]
+        },
+        "Parse State for Status": {
+            "main": [[{ "node": "Build Status Response", "type": "main", "index": 0 }]]
+        },
+        "Build Status Response": {
+            "main": [[{ "node": "Respond - Status", "type": "main", "index": 0 }]]
         }
     },
     "settings": {
         "executionOrder": "v1",
-        "callerPolicy": "workflowsFromSameOwner",
-        "availableInMCP": false
+        "callerPolicy": "workflowsFromSameOwner"
     },
-    "staticData": null,
-    "meta": null,
-    "pinData": null,
-    "versionId": "a6c8d155-8fef-4257-a3ce-3dce0319487e",
-    "activeVersionId": null,
-    "versionCounter": 4,
-    "triggerCount": 0,
-    "shared": [
-        {
-            "updatedAt": "2026-02-06T22:33:18.594Z",
-            "createdAt": "2026-02-06T22:33:18.594Z",
-            "role": "workflow:owner",
-            "workflowId": "vO3TJ3FajfSHXICz",
-            "projectId": "6RAJcBVHKTCwT4Nk",
-            "project": {
-                "updatedAt": "2026-01-31T20:05:52.751Z",
-                "createdAt": "2026-01-31T20:04:16.860Z",
-                "id": "6RAJcBVHKTCwT4Nk",
-                "name": "Marcin Zadka <gamboox@gmail.com>",
-                "type": "personal",
-                "icon": null,
-                "description": null,
-                "creatorId": "e59d292a-3ff3-4536-9954-55f7b84be35c",
-                "projectRelations": [
-                    {
-                        "updatedAt": "2026-01-31T20:04:16.861Z",
-                        "createdAt": "2026-01-31T20:04:16.861Z",
-                        "userId": "e59d292a-3ff3-4536-9954-55f7b84be35c",
-                        "projectId": "6RAJcBVHKTCwT4Nk",
-                        "user": {
-                            "updatedAt": "2026-02-06T23:26:28.000Z",
-                            "createdAt": "2026-01-31T20:04:15.351Z",
-                            "id": "e59d292a-3ff3-4536-9954-55f7b84be35c",
-                            "email": "gamboox@gmail.com",
-                            "firstName": "Marcin",
-                            "lastName": "Zadka",
-                            "personalizationAnswers": null,
-                            "settings": {
-                                "userActivated": true,
-                                "easyAIWorkflowOnboarded": true,
-                                "firstSuccessfulWorkflowId": "Bz5z78wyJwX7QtpaGItlN",
-                                "userActivatedAt": 1769976033082
-                            },
-                            "disabled": false,
-                            "mfaEnabled": false,
-                            "lastActiveAt": "2026-02-06",
-                            "isPending": false
-                        }
-                    }
-                ]
-            }
-        }
-    ],
-    "tags": [],
-    "activeVersion": null
+    "pinData": {},
+    "tags": [{ "name": "YouTube-ai-live-stream" }]
 }
