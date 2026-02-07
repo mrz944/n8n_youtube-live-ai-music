@@ -115,7 +115,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const defaults = {\n  style: 'A gentle lofi hip-hop beat with warm vinyl crackle, soft Rhodes piano chords, and a laid-back boom-bap drum pattern, Mellow bass hums underneath as ambient textures float in and out, 432Hz',\n  title: 'Late Night Drift',\n  genre: 'lofi',\n  energy: 'medium'\n};\n\nlet moodData = {};\ntry {\n  const json = $input.first().json;\n  moodData = json.data || json || {};\n} catch(e) {\n  // Use defaults if file missing or parse fails\n}\n\nreturn [{ json: { ...defaults, ...moodData } }];"
+        "jsCode": "const defaults = {\n  style: 'A slow-tempo psychedelic rock track launches with swirling organs and gently-effected electric guitar, Warm, steady bass holds down a relaxed, syncopated drum groove, Fluid synth layers quietly float beneath, creating an enveloping, smooth sonic atmosphere throughout. 432 Hz',\n  title: 'Vibe Journey',\n  genre: 'psychedelic rock',\n  energy: 'low'\n};\n\nlet moodData = {};\ntry {\n  const json = $input.first().json;\n  moodData = json.data || json || {};\n} catch(e) {\n  // Use defaults if file missing or parse fails\n}\n\nreturn [{ json: { ...defaults, ...moodData } }];"
       },
       "id": "a0000001-0000-0000-0000-000000000018",
       "name": "Parse Mood",
@@ -264,7 +264,34 @@
     },
     {
       "parameters": {
-        "url": "={{ $json.data.response.sunoData[0].audioUrl }}",
+        "fieldToSplitOut": "data.response.sunoData",
+        "options": {}
+      },
+      "id": "a0000001-0000-0000-0000-000000000022",
+      "name": "Split Into Items",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1504,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const track = $input.first().json;\n\n// Sanitize title for filename: remove special chars, limit length\nconst sanitizeTitle = (title) => {\n  if (!title) return 'Untitled';\n  return title\n    .replace(/[^a-zA-Z0-9\\s-]/g, '')  // Remove special chars\n    .replace(/\\s+/g, '_')              // Replace spaces with underscore\n    .substring(0, 50)                   // Limit to 50 chars\n    .replace(/_+$/, '');               // Remove trailing underscores\n};\n\nconst timestamp = Date.now();\nconst trackId = track.id.substr(0, 9);\nconst sanitizedTitle = sanitizeTitle(track.title);\n\n// Format: song_<timestamp>_<trackId>_<Title>\nconst songId = `song_${timestamp}_${trackId}_${sanitizedTitle}`;\n\nreturn [{\n  json: {\n    songId,\n    audioUrl: track.audioUrl,\n    imageUrl: track.imageUrl,\n    title: track.title,\n    sanitizedTitle,\n    duration: track.duration,\n    tags: track.tags\n  }\n}];"
+      },
+      "id": "a0000001-0000-0000-0000-000000000023",
+      "name": "Generate Song ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1728,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.audioUrl }}",
         "options": {
           "response": {
             "response": {
@@ -279,25 +306,65 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1504,
-        192
+        1952,
+        112
       ],
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
+        "url": "={{ $json.imageUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "a0000001-0000-0000-0000-000000000024",
+      "name": "Download Cover",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1952,
+        272
+      ],
+      "continueOnFail": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
         "operation": "write",
-        "fileName": "=/home/node/.n8n-files/music-stream/queue/{{ $node[\"Craft Suno Prompt\"].json.songId }}.mp3",
+        "fileName": "=/home/node/.n8n-files/music-stream/queue/{{ $json.songId }}.mp3",
         "options": {}
       },
       "id": "a0000001-0000-0000-0000-000000000012",
-      "name": "Save to Queue",
+      "name": "Save Audio to Queue",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1.1,
       "position": [
-        1728,
-        192
+        2176,
+        112
       ]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "=/home/node/.n8n-files/music-stream/queue/{{ $json.songId }}.jpg",
+        "options": {}
+      },
+      "id": "a0000001-0000-0000-0000-000000000025",
+      "name": "Save Cover to Queue",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        2176,
+        272
+      ],
+      "continueOnFail": true,
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -331,7 +398,7 @@
     },
     {
       "parameters": {
-        "jsCode": "let state = {};\ntry {\n  const json = $input.first().json;\n  state = { ...(json.data || json) };\n} catch(e) {\n  state = { broadcastId: null, streamKey: null, liveChatId: null, isActive: false, songsPlayed: 0 };\n}\n\nstate.songsGenerated = (state.songsGenerated || 0) + 1;\nstate.lastGenerationTime = new Date().toISOString();\nstate.lastSongId = $node['Craft Suno Prompt'].json.songId;\nstate.lastStyle = $node['Craft Suno Prompt'].json.style;\nstate.lastTitle = $node['Craft Suno Prompt'].json.title;\nstate.lastGenre = $node['Craft Suno Prompt'].json.genre;\n\nreturn [{ json: state }];"
+        "jsCode": "let state = {};\ntry {\n  const json = $input.first().json;\n  state = { ...(json.data || json) };\n} catch(e) {\n  state = { broadcastId: null, streamKey: null, liveChatId: null, isActive: false, songsPlayed: 0 };\n}\n\nstate.songsGenerated = (state.songsGenerated || 0) + 1;\nstate.lastGenerationTime = new Date().toISOString();\n\n// Get song data from Generate Song ID node\nconst songData = $node['Generate Song ID']?.json || {};\nstate.lastSongId = songData.songId;\nstate.lastTitle = songData.title;\n\n// Get style/genre from original mood data\nconst moodData = $node['Craft Suno Prompt']?.json || {};\nstate.lastStyle = moodData.style;\nstate.lastGenre = moodData.genre;\n\nreturn [{ json: state }];"
       },
       "id": "a0000001-0000-0000-0000-000000000020",
       "name": "Build Updated State",
@@ -530,7 +597,7 @@
       "main": [
         [
           {
-            "node": "Download Audio",
+            "node": "Split Into Items",
             "type": "main",
             "index": 0
           }
@@ -544,18 +611,67 @@
         ]
       ]
     },
-    "Download Audio": {
+    "Split Into Items": {
       "main": [
         [
           {
-            "node": "Save to Queue",
+            "node": "Generate Song ID",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Save to Queue": {
+    "Generate Song ID": {
+      "main": [
+        [
+          {
+            "node": "Download Audio",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Download Cover",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Audio": {
+      "main": [
+        [
+          {
+            "node": "Save Audio to Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Cover": {
+      "main": [
+        [
+          {
+            "node": "Save Cover to Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Audio to Queue": {
+      "main": [
+        [
+          {
+            "node": "Read State File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Cover to Queue": {
       "main": [
         [
           {

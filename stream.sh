@@ -64,9 +64,13 @@ fi
 cleanup() {
     echo "[$(date)] Stream script stopping (PID: $$)" >> "$LOG_FILE"
     rm -f "$PID_FILE"
-    # Move any file in playing back to queue
+    # Move any files in playing back to queue (BOTH mp3 and jpg)
     for f in "$PLAYING_DIR"/*.mp3; do
-        [ -f "$f" ] && mv "$f" "$QUEUE_DIR/"
+        if [ -f "$f" ]; then
+            mv "$f" "$QUEUE_DIR/"
+            BASENAME=$(basename "$f" .mp3)
+            [ -f "$PLAYING_DIR/$BASENAME.jpg" ] && mv "$PLAYING_DIR/$BASENAME.jpg" "$QUEUE_DIR/"
+        fi
     done
     exit 0
 }
@@ -91,13 +95,29 @@ while true; do
 
     if [ -n "$NEXT" ]; then
         FILENAME=$(basename "$NEXT")
+        BASENAME="${FILENAME%.mp3}"  # Extract basename without extension
         echo "[$(date)] Playing: $FILENAME" >> "$LOG_FILE"
 
-        # Move to playing directory
+        # Move MP3 to playing directory
         mv "$NEXT" "$PLAYING_DIR/$FILENAME"
 
-        # Stream with FFmpeg: static image + audio → RTMP
-        ffmpeg -re -loop 1 -i "$BG_IMG" -i "$PLAYING_DIR/$FILENAME" \
+        # Move cover to playing directory (if exists)
+        if [ -f "$QUEUE_DIR/$BASENAME.jpg" ]; then
+            mv "$QUEUE_DIR/$BASENAME.jpg" "$PLAYING_DIR/$BASENAME.jpg"
+            echo "[$(date)] Cover found: $BASENAME.jpg" >> "$LOG_FILE"
+        fi
+
+        # Select image: cover if available, otherwise background
+        if [ -f "$PLAYING_DIR/$BASENAME.jpg" ]; then
+            IMAGE_INPUT="$PLAYING_DIR/$BASENAME.jpg"
+            echo "[$(date)] Using cover: $BASENAME.jpg" >> "$LOG_FILE"
+        else
+            IMAGE_INPUT="$BG_IMG"
+            echo "[$(date)] No cover found, using background.png" >> "$LOG_FILE"
+        fi
+
+        # Stream with FFmpeg: image + audio → RTMP
+        ffmpeg -re -loop 1 -i "$IMAGE_INPUT" -i "$PLAYING_DIR/$FILENAME" \
             -c:v libx264 -preset ultrafast -tune stillimage \
             -c:a aac -b:a 192k -ar 44100 \
             -pix_fmt yuv420p -shortest \
@@ -106,15 +126,23 @@ while true; do
         FFMPEG_EXIT=$?
         echo "[$(date)] FFmpeg exited with code: $FFMPEG_EXIT for $FILENAME" >> "$LOG_FILE"
 
-        # Move to played directory
+        # Move to played directory (both files)
         mv "$PLAYING_DIR/$FILENAME" "$PLAYED_DIR/$FILENAME"
+        [ -f "$PLAYING_DIR/$BASENAME.jpg" ] && mv "$PLAYING_DIR/$BASENAME.jpg" "$PLAYED_DIR/$BASENAME.jpg"
     else
         # Queue empty - move one song from played directory for replay
         REPLAY_FILE=$(ls -1 "$PLAYED_DIR"/*.mp3 2>/dev/null | sort | head -1)
 
         if [ -n "$REPLAY_FILE" ]; then
             FILENAME=$(basename "$REPLAY_FILE")
+            BASENAME="${FILENAME%.mp3}"
+
+            # Move MP3 back to queue
             mv "$REPLAY_FILE" "$QUEUE_DIR/$FILENAME"
+
+            # Move cover back to queue (if exists)
+            [ -f "$PLAYED_DIR/$BASENAME.jpg" ] && mv "$PLAYED_DIR/$BASENAME.jpg" "$QUEUE_DIR/$BASENAME.jpg"
+
             echo "[$(date)] REPLAY: Moved $FILENAME from played/ to queue/" >> "$LOG_FILE"
             # Don't sleep - immediately try to play it in next iteration
         else

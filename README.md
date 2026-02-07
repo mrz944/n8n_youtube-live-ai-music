@@ -1,6 +1,6 @@
-# YouTube Live AI Music Stream
+# 🔊 Vibe Radio - 24/7 Chat Controlled Music Stream
 
-Continuous AI-generated music playing on a YouTube Live stream. Viewers influence the mood and genre of upcoming songs through YouTube Live chat. An LLM (Claude on AWS Bedrock) analyzes chat messages and adjusts the music generation prompts accordingly.
+Continuous AI-generated psychedelic rock streaming on YouTube Live. Viewers influence the mood and genre of upcoming songs through YouTube Live chat. An LLM (Claude on AWS Bedrock) analyzes chat messages and adjusts the music generation prompts accordingly. Each song features unique AI-generated cover artwork displayed during streaming.
 
 ## Architecture
 
@@ -37,35 +37,47 @@ Continuous AI-generated music playing on a YouTube Live stream. Viewers influenc
 
 ## Workflows
 
-### 1. Music Generator (`z5u89ssBnW6Bq74G`) - 18 nodes
+### 1. Music Generator (`z5u89ssBnW6Bq74G`) - 24 nodes
 
 **Trigger:** Schedule every 3 minutes
 
 **Flow:**
 1. Count queue files via `Read/Write Files from Disk` (glob: `queue/*.mp3`)
 2. Evaluate queue status in Code node (count items with binary data, set `needsGeneration`)
-3. If fewer than 2 songs queued, generate a new one:
+3. If fewer than 2 songs queued, generate new ones:
    - Read current mood via `Read/Write Files from Disk` (`mood.json`)
-   - Parse mood binary data in Code node with `Buffer.from(base64).toString()` and fallback defaults
+   - Parse mood binary data in Code node with fallback defaults (psychedelic rock style)
    - Build Suno V5 API request body from style description
    - POST to Suno API (`api.sunoapi.org`) to start generation (model V5, customMode, instrumental)
-   - Poll task status for completion (90s wait + status check loop)
-   - Download the generated MP3
-   - Save to queue directory
-   - Read state.json via `Read/Write Files from Disk`, update stats in Code node (outputs binary), write back via `Write Binary File`
+   - Poll task status for completion (30s wait + status check loop)
+   - **Split Into Items** - Process ALL songs returned in `sunoData[]` array (Suno can return multiple variations)
+   - **Generate Song ID** - Create unique filename with sanitized title: `song_<timestamp>_<trackId>_<Title>`
+   - **Download Audio + Cover in parallel** - Fetch MP3 and cover image (JPG) from Suno response
+   - **Save both files** to queue directory with matching basenames
+   - Update state.json with song count and metadata
 
-**Note:** File operations use `Read/Write Files from Disk` and `Write Binary File` nodes instead of `require('fs')` because the n8n task runner sandbox disallows the `fs` module. `Execute Command` is also disabled by default on Mikrus-hosted n8n.
+**New Features:**
+- **Multi-song handling** - Saves ALL songs if Suno returns multiple variations (not just the first)
+- **Cover images** - Downloads and saves cover art alongside each MP3
+- **Readable filenames** - Includes song title: `song_1707329100_abc123_Vibe_Journey.mp3` and `.jpg`
 
-**Credentials:** Suno API (HTTP Header Auth)
+**Note:** File operations use `Read/Write Files from Disk` nodes instead of `require('fs')` because the n8n task runner sandbox disallows the `fs` module.
+
+**Credentials:** Suno API (HTTP Bearer Auth)
 
 ### 2. Stream Controller (`vO3TJ3FajfSHXICz`) - 17 nodes
 
 **Trigger:** Webhook POST `/stream-control`
 
 **Actions:**
-- `{"action": "start"}` - Creates YouTube Live Broadcast + Stream, binds them, saves RTMP info to state.json, transitions to live
+- `{"action": "start"}` - Creates YouTube Live Broadcast + Stream with title "🔊 Vibe Radio - 24/7 Chat controlled music experience [Live]", binds them, saves RTMP info to state.json, transitions to live
 - `{"action": "stop"}` - Ends YouTube broadcast, marks stream as inactive
 - `{"action": "status"}` - Returns full system status (queue size, current mood, stream state)
+
+**Stream Details:**
+- **Title**: "🔊 Vibe Radio - 24/7 Chat controlled music experience [Live]"
+- **Description**: "Vibe Radio is unique experience. Every song is played just once and mood of the stream is based on chat interaction."
+- **Privacy**: Unlisted (can be changed to public in workflow)
 
 **Note:** After starting, you must manually run `stream.sh` on the host to begin FFmpeg streaming. The n8n container cannot start processes on the host.
 
@@ -89,13 +101,13 @@ The Music Generator reads `mood.json` on each generation cycle, so chat influenc
 **mood.json format:**
 ```json
 {
-  "style": "A slow-tempo psychedelic rock track opens with swirling organs and laid-back electric guitar, coated in subtle effects, The groove is anchored by a warm, steady bass and a relaxed, syncopated drum beat, 432Hz",
-  "title": "Cosmic Drift",
+  "style": "A slow-tempo psychedelic rock track launches with swirling organs and gently-effected electric guitar, Warm, steady bass holds down a relaxed, syncopated drum groove, Fluid synth layers quietly float beneath, creating an enveloping, smooth sonic atmosphere throughout. 432 Hz",
+  "title": "Vibe Journey",
   "genre": "psychedelic rock",
   "energy": "low"
 }
 ```
-The `style` field is passed directly to Suno V5 as the music generation prompt.
+The `style` field is passed directly to Suno V5 as the music generation prompt. Cover images are automatically generated by Suno alongside each track.
 
 **Credentials:** Google OAuth2 API + AWS (Bedrock)
 
@@ -132,7 +144,7 @@ ffmpeg -f lavfi -i "color=c=0x1a1a2e:s=1280x720:d=1" \
   -frames:v 1 ~/.n8n-files/music-stream/background.png
 
 # Initialize state files
-echo '{"style":"A gentle lofi hip-hop beat with warm vinyl crackle, soft Rhodes piano chords, and a laid-back boom-bap drum pattern, Mellow bass hums underneath as ambient textures float in and out, 432Hz","title":"Late Night Drift","genre":"lofi","energy":"medium"}' \
+echo '{"style":"A slow-tempo psychedelic rock track launches with swirling organs and gently-effected electric guitar, Warm, steady bass holds down a relaxed, syncopated drum groove, Fluid synth layers quietly float beneath, creating an enveloping, smooth sonic atmosphere throughout. 432 Hz","title":"Vibe Journey","genre":"psychedelic rock","energy":"low"}' \
   > ~/.n8n-files/music-stream/mood.json
 echo '{"broadcastId":null,"streamKey":null,"liveChatId":null,"isActive":false,"songsPlayed":0}' \
   > ~/.n8n-files/music-stream/state.json
@@ -206,14 +218,42 @@ The LLM considers all recent messages holistically rather than picking a single 
 
 ## File Structure
 
+### Project Files
 ```
 youtube-live-ai-music/
 +-- README.md                          # This file
 +-- stream.sh                          # FFmpeg streaming script (copy to host)
-+-- workflow-music-generator.json      # n8n workflow backup
-+-- workflow-stream-controller.json    # n8n workflow backup
++-- workflow-music-generator.json      # n8n workflow backup (updated: multi-song + covers)
++-- workflow-stream-controller.json    # n8n workflow backup (updated: new title/description)
 +-- workflow-chat-monitor.json         # n8n workflow backup
 ```
+
+### Runtime Directory Structure (on VPS)
+```
+~/.n8n-files/music-stream/
++-- queue/
+|   +-- song_1707329100_abc123_Vibe_Journey.mp3
+|   +-- song_1707329100_abc123_Vibe_Journey.jpg      ← Cover images
+|   +-- song_1707329200_def456_Cosmic_Drift.mp3
+|   +-- song_1707329200_def456_Cosmic_Drift.jpg
++-- playing/                                          ← Both MP3 and JPG move together
+|   +-- (currently streaming files)
++-- played/                                           ← Both MP3 and JPG move together
+|   +-- (already played songs with covers)
++-- scripts/
+|   +-- stream.sh                                     ← FFmpeg streaming script
++-- logs/
+|   +-- ffmpeg.log                                    ← Stream logs
++-- background.png                                     ← Fallback image (1280x720)
++-- state.json                                        ← Stream state and statistics
++-- mood.json                                         ← Current music style
+```
+
+**File Naming Convention:**
+- MP3 and JPG files share the same basename
+- Format: `song_<timestamp>_<trackId>_<SanitizedTitle>.ext`
+- Titles are sanitized: special characters removed, spaces→underscores, max 50 chars
+- Example: `song_1707329100_abc123_Vibe_Journey.mp3` and `.jpg`
 
 ## Troubleshooting
 
@@ -235,3 +275,25 @@ youtube-live-ai-music/
 **Gap between songs:**
 - Each song is a separate FFmpeg invocation; 1-3 second gaps are normal
 - YouTube handles brief RTMP interruptions gracefully
+
+**Covers not displaying:**
+- Check if `.jpg` files exist alongside `.mp3` files in queue/playing/played directories
+- Verify file permissions: n8n container (UID 1000) must be able to write `.jpg` files
+- Check FFmpeg logs: `tail -f ~/.n8n-files/music-stream/logs/ffmpeg.log`
+- Look for "Using cover" vs "No cover found" messages in logs
+- If cover download fails, stream will automatically fallback to `background.png`
+
+**Only some songs have covers:**
+- Normal! Covers are only generated for songs created after implementing this feature
+- Old songs in `played/` directory will use `background.png` when replayed
+- Over time, all songs in rotation will have covers
+
+**Wrong cover displayed:**
+- Verify filenames match: MP3 and JPG must have identical basenames
+- Example: `song_123_Title.mp3` requires `song_123_Title.jpg`
+- Check for orphaned cover files (`.jpg` without matching `.mp3`)
+
+**Multiple songs not saving:**
+- Check Music Generator workflow execution logs in n8n
+- Verify "Split Into Items" node is processing all items from `sunoData[]` array
+- Check `songsGenerated` counter in state.json (should increment correctly)

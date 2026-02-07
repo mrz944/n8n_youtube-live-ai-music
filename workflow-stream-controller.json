@@ -47,7 +47,7 @@
                 "sendBody": true,
                 "contentType": "json",
                 "specifyBody": "json",
-                "jsonBody": "={{ JSON.stringify({ snippet: { title: 'AI Generated Music - Live Stream', description: 'Continuous AI-generated music. Chat to change the mood! Commands: suggest genres, moods, or vibes in chat.', scheduledStartTime: new Date().toISOString() }, status: { privacyStatus: 'unlisted', selfDeclaredMadeForKids: false }, contentDetails: { enableAutoStart: true, enableAutoStop: false, enableDvr: true, latencyPreference: 'normal' } }) }}",
+                "jsonBody": "={{ JSON.stringify({ snippet: { title: '🔊 Vibe Radio - 24/7 Chat controlled music experience [Live]', description: 'Vibe Radio is unique experience. Every song is played just once and mood of the stream is based on chat interaction.', scheduledStartTime: new Date().toISOString() }, status: { privacyStatus: 'unlisted', selfDeclaredMadeForKids: false }, contentDetails: { enableAutoStart: true, enableAutoStop: false, enableDvr: true, latencyPreference: 'normal' } }) }}",
                 "options": { "timeout": 30000 }
             }
         },
