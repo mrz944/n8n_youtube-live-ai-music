@@ -45,9 +45,9 @@ Continuous AI-generated music playing on a YouTube Live stream. Viewers influenc
 1. Check queue size (count MP3 files in queue directory)
 2. If fewer than 2 songs queued, generate a new one:
    - Read current mood from `mood.json`
-   - Craft a descriptive prompt from mood data (genre, energy, tempo)
-   - POST to Suno API to start generation
-   - Poll for completion (90s wait + status check loop)
+   - Build Suno V5 API request body from style description in `mood.json`
+   - POST to Suno API (`api.sunoapi.org`) to start generation (model V5, customMode, instrumental)
+   - Poll task status for completion (90s wait + status check loop)
    - Download the generated MP3
    - Save to queue directory
    - Update statistics in `state.json`
@@ -77,10 +77,21 @@ Continuous AI-generated music playing on a YouTube Live stream. Viewers influenc
 3. Save pagination token for next poll
 4. Filter and format messages (last 20 meaningful messages)
 5. Feed to Claude on AWS Bedrock via Basic LLM Chain
-6. Parse LLM's JSON response (mood, genre, energy, tempo, description)
+6. Parse LLM's JSON response containing a rich style description, title, genre, and energy level
 7. Validate and write to `mood.json` (atomic write)
 
 The Music Generator reads `mood.json` on each generation cycle, so chat influence takes effect on the next song.
+
+**mood.json format:**
+```json
+{
+  "style": "A slow-tempo psychedelic rock track opens with swirling organs and laid-back electric guitar, coated in subtle effects, The groove is anchored by a warm, steady bass and a relaxed, syncopated drum beat, 432Hz",
+  "title": "Cosmic Drift",
+  "genre": "psychedelic rock",
+  "energy": "low"
+}
+```
+The `style` field is passed directly to Suno V5 as the music generation prompt.
 
 **Credentials:** Google OAuth2 API + AWS (Bedrock)
 
@@ -91,7 +102,7 @@ The Music Generator reads `mood.json` on each generation cycle, so chat influenc
 | Credential | Type | Purpose |
 |------------|------|---------|
 | Google OAuth2 API | `googleOAuth2Api` | YouTube Live Broadcast + Chat APIs |
-| Suno API | `httpHeaderAuth` | Music generation (Header: `Authorization: Bearer <key>`) |
+| Suno API | `httpHeaderAuth` | Music generation via api.sunoapi.org (Header: `Authorization: Bearer <key>`) |
 | AWS | `aws` | Bedrock Claude access |
 
 **Google OAuth2 setup:**
@@ -117,7 +128,7 @@ ffmpeg -f lavfi -i "color=c=0x1a1a2e:s=1280x720:d=1" \
   -frames:v 1 ~/.n8n/music-stream/background.png
 
 # Initialize state files
-echo '{"mood":"chill electronic","genre":"lofi","energy":"medium","tempo":90,"description":"Relaxing lofi beats"}' \
+echo '{"style":"A gentle lofi hip-hop beat with warm vinyl crackle, soft Rhodes piano chords, and a laid-back boom-bap drum pattern, Mellow bass hums underneath as ambient textures float in and out, 432Hz","title":"Late Night Drift","genre":"lofi","energy":"medium"}' \
   > ~/.n8n/music-stream/mood.json
 echo '{"broadcastId":null,"streamKey":null,"liveChatId":null,"isActive":false,"songsPlayed":0}' \
   > ~/.n8n/music-stream/state.json
@@ -179,7 +190,7 @@ Viewers can influence the music by posting messages in the YouTube Live chat. Th
 - "dubstep time" -> switches to dubstep with high energy
 - "something tropical" -> tropical house mood
 
-The LLM considers all recent messages holistically rather than picking a single command. If no clear music preference is expressed, the current mood continues unchanged.
+The LLM considers all recent messages holistically rather than picking a single command. It outputs a rich, detailed style description that is passed directly to Suno V5 as the generation prompt. If no clear music preference is expressed, the style evolves subtly rather than staying identical.
 
 ## File Structure
 
