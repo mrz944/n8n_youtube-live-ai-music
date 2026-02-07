@@ -1,0 +1,265 @@
+{
+  "name": "Music Generator - AI Live Stream",
+  "nodes": [
+    {
+      "id": "a0000001-0000-0000-0000-000000000001",
+      "name": "Generate Every 3 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-1400, 300],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a0000001-0000-0000-0000-000000000002",
+      "name": "Check Queue & Health",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-1160, 300],
+      "parameters": {
+        "jsCode": "const fs = require('fs');\n\n// Check queue size\nlet queueSize = 0;\ntry {\n  const files = fs.readdirSync('/home/node/.n8n/music-stream/queue/')\n    .filter(f => f.endsWith('.mp3'));\n  queueSize = files.length;\n} catch(e) {\n  queueSize = 0;\n}\n\nreturn [{\n  json: {\n    queueSize,\n    needsGeneration: queueSize < 2,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      }
+    },
+    {
+      "id": "a0000001-0000-0000-0000-000000000003",
+      "name": "IF Queue Needs Songs",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-920, 300],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "id": "condition-queue-check",
+              "leftValue": "={{ $json.needsGeneration }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a0000001-0000-0000-0000-000000000004",
+      "name": "Read Current Mood",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-680, 200],
+      "parameters": {
+        "jsCode": "const fs = require('fs');\n\nlet mood = {\n  mood: 'chill electronic',\n  genre: 'lofi',\n  energy: 'medium',\n  tempo: 90,\n  description: 'Relaxing lofi beats'\n};\n\ntry {\n  const moodData = JSON.parse(fs.readFileSync('/home/node/.n8n/music-stream/mood.json', 'utf8'));\n  mood = { ...mood, ...moodData };\n} catch(e) {\n  // Use defaults if mood.json missing or corrupt\n}\n\nreturn [{ json: mood }];"
+      }
+    },
+    {
+      "id": "a0000001-0000-0000-0000-000000000005",
+      "name": "Craft Suno Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-440, 200],
+      "parameters": {
+        "jsCode": "const mood = $input.first().json;\n\nconst tempoMap = {\n  'low': Math.floor(Math.random() * (90 - 60) + 60),\n  'medium': Math.floor(Math.random() * (120 - 85) + 85),\n  'high': Math.floor(Math.random() * (150 - 110) + 110)\n};\n\nconst tempo = mood.tempo || tempoMap[mood.energy] || 100;\n\nconst prompt = `Create a ${mood.mood} ${mood.genre} instrumental track, ${mood.energy} energy, approximately ${tempo} BPM, 3-4 minutes long, high quality production, no vocals. ${mood.description || ''}`.trim();\n\nconst songId = `song_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;\n\nreturn [{\n  json: {\n    prompt,\n    songId,\n    genre: mood.genre,\n    mood: mood.mood,\n    energy: mood.energy,\n    tempo,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      }
+    },
+    {
+      "id": "a0000001-0000-0000-0000-000000000006",
+      "name": "Suno API - Generate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-200, 200],
+      "continueOnFail": true,
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.suno.ai/v1/generate",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ prompt: $json.prompt, make_instrumental: true, wait_audio: false }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      }
+    },
+    {
+      "id": "a0000001-0000-0000-0000-000000000007",
+      "name": "Extract Clip ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, 200],
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\n\n// Handle different Suno API response formats\nlet clipId;\nlet status = 'pending';\n\nif (Array.isArray(response)) {\n  clipId = response[0].id;\n  status = response[0].status || 'pending';\n} else if (response.clips && Array.isArray(response.clips)) {\n  clipId = response.clips[0].id;\n  status = response.clips[0].status || 'pending';\n} else if (response.id) {\n  clipId = response.id;\n  status = response.status || 'pending';\n} else {\n  throw new Error('Unable to extract clip ID from Suno response: ' + JSON.stringify(response).substring(0, 200));\n}\n\nreturn [{\n  json: {\n    clipId,\n    status,\n    retryCount: 0\n  }\n}];"
+      }
+    },
+    {
+      "id": "a0000001-0000-0000-0000-000000000008",
+      "name": "Wait for Generation",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [200, 200],
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 90,
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "a0000001-0000-0000-0000-000000000009",
+      "name": "Suno API - Check Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [400, 200],
+      "continueOnFail": true,
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.suno.ai/v1/clips/{{ $node[\"Extract Clip ID\"].json.clipId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 30000
+        }
+      }
+    },
+    {
+      "id": "a0000001-0000-0000-0000-000000000010",
+      "name": "IF Generation Complete",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [600, 200],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "id": "condition-gen-complete",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "complete",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a0000001-0000-0000-0000-000000000011",
+      "name": "Download Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [800, 100],
+      "continueOnFail": true,
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.audio_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
+          "timeout": 60000
+        }
+      }
+    },
+    {
+      "id": "a0000001-0000-0000-0000-000000000012",
+      "name": "Save to Queue",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [1000, 100],
+      "parameters": {
+        "fileName": "=/home/node/.n8n/music-stream/queue/{{ $node[\"Craft Suno Prompt\"].json.songId }}.mp3",
+        "dataPropertyName": "data",
+        "options": {}
+      }
+    },
+    {
+      "id": "a0000001-0000-0000-0000-000000000013",
+      "name": "Update Stats",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 100],
+      "parameters": {
+        "jsCode": "const fs = require('fs');\n\nconst statePath = '/home/node/.n8n/music-stream/state.json';\nconst tmpPath = statePath + '.tmp';\n\nlet state = {};\ntry {\n  state = JSON.parse(fs.readFileSync(statePath, 'utf8'));\n} catch(e) {\n  state = { broadcastId: null, streamKey: null, liveChatId: null, isActive: false, songsPlayed: 0 };\n}\n\nstate.songsGenerated = (state.songsGenerated || 0) + 1;\nstate.lastGenerationTime = new Date().toISOString();\nstate.lastSongId = $node['Craft Suno Prompt'].json.songId;\nstate.lastGenre = $node['Craft Suno Prompt'].json.genre;\nstate.lastMood = $node['Craft Suno Prompt'].json.mood;\n\n// Atomic write\nfs.writeFileSync(tmpPath, JSON.stringify(state, null, 2));\nfs.renameSync(tmpPath, statePath);\n\nreturn [{ json: { success: true, songsGenerated: state.songsGenerated, songId: state.lastSongId } }];"
+      }
+    },
+    {
+      "id": "a0000001-0000-0000-0000-000000000014",
+      "name": "Queue Full - No Action",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [-680, 420],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "Generate Every 3 Minutes": {
+      "main": [[{"node": "Check Queue & Health", "type": "main", "index": 0}]]
+    },
+    "Check Queue & Health": {
+      "main": [[{"node": "IF Queue Needs Songs", "type": "main", "index": 0}]]
+    },
+    "IF Queue Needs Songs": {
+      "main": [
+        [{"node": "Read Current Mood", "type": "main", "index": 0}],
+        [{"node": "Queue Full - No Action", "type": "main", "index": 0}]
+      ]
+    },
+    "Read Current Mood": {
+      "main": [[{"node": "Craft Suno Prompt", "type": "main", "index": 0}]]
+    },
+    "Craft Suno Prompt": {
+      "main": [[{"node": "Suno API - Generate", "type": "main", "index": 0}]]
+    },
+    "Suno API - Generate": {
+      "main": [[{"node": "Extract Clip ID", "type": "main", "index": 0}]]
+    },
+    "Extract Clip ID": {
+      "main": [[{"node": "Wait for Generation", "type": "main", "index": 0}]]
+    },
+    "Wait for Generation": {
+      "main": [[{"node": "Suno API - Check Status", "type": "main", "index": 0}]]
+    },
+    "Suno API - Check Status": {
+      "main": [[{"node": "IF Generation Complete", "type": "main", "index": 0}]]
+    },
+    "IF Generation Complete": {
+      "main": [
+        [{"node": "Download Audio", "type": "main", "index": 0}],
+        [{"node": "Wait for Generation", "type": "main", "index": 0}]
+      ]
+    },
+    "Download Audio": {
+      "main": [[{"node": "Save to Queue", "type": "main", "index": 0}]]
+    },
+    "Save to Queue": {
+      "main": [[{"node": "Update Stats", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
