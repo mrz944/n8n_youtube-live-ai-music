@@ -131,7 +131,7 @@ while true; do
         [ -f "$PLAYING_DIR/$BASENAME.jpg" ] && mv "$PLAYING_DIR/$BASENAME.jpg" "$PLAYED_DIR/$BASENAME.jpg"
     else
         # Queue empty - move one song from played directory for replay
-        REPLAY_FILE=$(ls -1 "$PLAYED_DIR"/*.mp3 2>/dev/null | sort | head -1)
+        REPLAY_FILE=$(ls -1 "$PLAYED_DIR"/*.mp3 2>/dev/null | shuf -n 1)
 
         if [ -n "$REPLAY_FILE" ]; then
             FILENAME=$(basename "$REPLAY_FILE")
